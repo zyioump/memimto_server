@@ -1,0 +1,42 @@
+version: "3.4"
+
+services:
+  mariadb:
+    image: mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_PASSWORD=passwordflask
+      - MYSQL_USER=flask
+      - MYSQL_DATABASE=flask
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+
+  web:
+    build:
+      context: .
+    volumes: 
+      - data:/data
+    depends_on:
+      - redis
+      - mariadb
+    ports:
+      - 8000:8000
+
+  worker:
+    build:
+      context: .
+    volumes: 
+      - data:/data
+    command: celery -A memimto.__main__.celery worker
+    depends_on:
+      - redis
+      - mariadb 
+
+volumes:
+  data: 
+  db_data:
