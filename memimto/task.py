@@ -85,7 +85,7 @@ def new_album(file_name):
         album_name = file_name.split(".")[0]
         print(f"New album : {album_name}")
         db_session = db.session
-        album = Album(name=album_name)
+        album = Album(name=album_name.title())
         db_session.add(album)
         db_session.commit()
         print(f"Unzip : {album_name}")

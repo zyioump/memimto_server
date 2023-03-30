@@ -12,7 +12,8 @@ class Album(db.Model):
         return {
             "id": self.id,
             "name": self.name,
-            "length": len(self.images)
+            "length": len(self.images),
+            "sample": [image.to_dict() for image in self.images[0:4]]
         }
 
 class Image(db.Model):

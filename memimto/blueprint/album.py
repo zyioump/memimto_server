@@ -39,6 +39,9 @@ def album_cluster(album_id, cluster):
 @album_bp.route('/album/<int:album_id>/find_cluster', methods=["POST"])
 def find_cluster(album_id):
     album = Album.query.get_or_404(album_id)
+    if album.classifier is None:
+        return {"cluster": -1}
+        
     classifier = pickle.loads(album.classifier)
 
     image_b64 = request.data.decode().split("base64,")[1]
