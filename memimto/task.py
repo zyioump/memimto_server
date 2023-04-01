@@ -13,6 +13,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 import numpy as np
 from uuid import uuid4
 import imghdr
+import logging
 
 def unzip(file_name, album_name):
     data_dir = Path(current_app.config["data_dir"])
@@ -44,40 +45,65 @@ def unzip(file_name, album_name):
 def extract_face(image_list, album, db_session):
     data_dir = Path(current_app.config["data_dir"])
 
-    faces = {"image" : [], "encoding": []}
+    faces = []
     for (i, image_name) in enumerate(image_list):
         if (i%10 == 0): 
             print(f"Album : {album.name}, Image : {i+1}/{len(image_list)}")
-        
-        image_db = Image(name=image_name, album=album)
-        db_session.add(image_db)
-        db_session.commit()
 
         image = face_recognition.load_image_file(data_dir / image_name)
         boxes = face_recognition.face_locations(image)
         encodings = face_recognition.face_encodings(image, boxes)
-        
-        faces["encoding"].extend(encodings)
-        faces["image"].extend([image_db] * len(encodings))
     
+        image_db = Image(name=image_name, album=album)
+        db_session.add(image_db)
+
+        faces_db = [Face(image=image_db, encoding=pickle.dumps(encoding)) for encoding in encodings]
+        db_session.add_all(faces_db)
+
+        faces.extend(faces_db)
+
+        db_session.commit()
     return faces
 
-def cluster(album_db, faces, db_session):
-    encodings = np.vstack(faces["encoding"])
+def cluster(album_db, faces_db, db_session):
+    encodings = [pickle.loads(face.encoding) for face in faces_db]
+    encodings = np.vstack(encodings)
     optics = OPTICS(xi=0.0000001, metric="correlation")
     optics.fit(encodings)
 
     labels = optics.labels_
     print(f"{len(np.unique(labels))-1} different faces detected")
 
+    for i, label in enumerate(labels):
+        faces_db[i].cluster = label
+
+    print("Train classifier")
     classifier = GaussianProcessClassifier()
     classifier.fit(encodings, labels)
 
-    album_db.classifier = pickle.dumps(classifier)
     print("Save")
-    faces_db = [Face(image=image, cluster=int(label)) for (label, image) in zip(labels, faces["image"])]
-    db_session.add_all(faces_db)
+    classifier_name = str(uuid4()) + ".pickle"
+
+    album_db.classifier = classifier_name
+
+    with open(current_app.config["data_dir"] / classifier_name, "wb") as classifier_file:
+        pickle.dump(classifier, classifier_file)
+
     db_session.commit()
+
+@celery.task()
+def re_cluster_album(album_id):
+    try:
+        album = Album.query.get_or_404(album_id)
+        print(f"Reclustering album {album.name}")
+        faces = []
+        for image in album.images:
+            faces.extend(image.faces)
+
+        cluster(album, faces, db.session)
+        print("Done")
+    except Exception as e:
+        logging.exception(e)
 
 @celery.task()
 def new_album(file_name):
@@ -96,4 +122,4 @@ def new_album(file_name):
         cluster(album, faces, db_session)
         print(f"Album {album_name} done")
     except Exception as e:
-        print(e)
+        logging.exception(e)

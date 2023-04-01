@@ -20,4 +20,4 @@ RUN python setup.py install
 
 EXPOSE 8000
 
-CMD ["gunicorn", "-b", "0.0.0.0", "memimto.__main__:app"]
+CMD ["gunicorn", "-b", "0.0.0.0", "--log-level=DEBUG", "memimto.__main__:app"]

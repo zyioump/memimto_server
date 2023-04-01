@@ -20,7 +20,8 @@ setup(
         "scikit-learn",
         "python-dotenv",
         "gunicorn",
-        "pymysql"
+        "pymysql",
+        "PyJWT"
     ],
     entry_points={
         'console_scripts': [

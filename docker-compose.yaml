@@ -8,6 +8,7 @@ services:
       - MYSQL_PASSWORD=passwordflask
       - MYSQL_USER=flask
       - MYSQL_DATABASE=flask
+      - MYSQL_MAX_ALLOWED_PACKET=200M
     volumes:
       - db_data:/var/lib/mysql
 

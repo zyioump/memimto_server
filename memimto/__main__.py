@@ -4,12 +4,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from memimto.models import db
-from memimto.blueprint.upload import upload_bp
+from memimto.models import db, User
+from memimto.blueprint.command import command_bp
 from memimto.blueprint.album import album_bp
+from memimto.blueprint.account import account_bp
 from memimto.celery import celery
 import os
-
 
 import argparse
 from pathlib import Path
@@ -45,15 +45,21 @@ if not os.path.exists(data_dir):
 
 app.config["data_dir"] = data_dir
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URI")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 db.init_app(app)
 
 celery.init_app(app)
 
 with app.app_context():
     db.create_all()
+    if not User.query.filter_by(name="admin").first():
+        admin_user = User(name="admin", password=os.environ.get("ADMIN_PASSWORD"))
+        db.session.add(admin_user)
+        db.session.commit()
 
-app.register_blueprint(upload_bp)
+app.register_blueprint(command_bp)
 app.register_blueprint(album_bp)
+app.register_blueprint(account_bp)
 
 CORS(app)
 

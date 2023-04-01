@@ -1,11 +1,11 @@
 from flask import Blueprint
-from flask import request, current_app, abort, request
+from flask import request, current_app, abort, send_file
 from memimto.models import db, Album, Image
-from flask import current_app, send_file
 import face_recognition
 from base64 import b64decode
 import os
 import pickle
+import logging
 import PIL
 import io
 import numpy as np
@@ -41,8 +41,9 @@ def find_cluster(album_id):
     album = Album.query.get_or_404(album_id)
     if album.classifier is None:
         return {"cluster": -1}
-        
-    classifier = pickle.loads(album.classifier)
+    
+    with open(current_app.config["data_dir"] / album.classifier, "rb") as classifier_file:
+        classifier = pickle.load(classifier_file)
 
     image_b64 = request.data.decode().split("base64,")[1]
     image_data = b64decode(image_b64)
@@ -52,10 +53,10 @@ def find_cluster(album_id):
     if len(boxes) > 0:
         encodings = face_recognition.face_encodings(image, boxes)
         cluster = classifier.predict(encodings)
-        print(f"Cluster detected : {cluster} for album {album_id}")
+        logging.warning(f"Cluster detected : {cluster} for album {album_id}")
         return {"cluster": int(cluster[0])}
     else:
-        print("No face detected")
+        logging.warning("No face detected")
         return {"cluster": -1}
 
 @album_bp.route('/image/<name>')

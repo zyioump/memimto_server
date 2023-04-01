@@ -1,6 +1,6 @@
 from celery import Celery
 import flask
-import os
+from os import environ
 
 class FlaskCelery(Celery):
     def __init__(self, *args, **kwargs):
@@ -30,4 +30,4 @@ class FlaskCelery(Celery):
         self.app = app
         self.config_from_object(app.config)
 
-celery = FlaskCelery("memimto", backend=os.environ.get("BROKER_URI"), broker=os.environ.get("BROKER_URI"))
+celery = FlaskCelery("memimto", backend=environ.get("BROKER_URI"), broker=environ.get("BROKER_URI"))
