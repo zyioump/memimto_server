@@ -6,7 +6,6 @@ from flask import current_app
 from memimto.celery import celery
 from memimto.models import db, Album, Image, Face
 from werkzeug.utils import secure_filename
-import face_recognition
 import pickle
 from sklearn.cluster import OPTICS
 from sklearn.gaussian_process import GaussianProcessClassifier
@@ -43,15 +42,15 @@ def unzip(file_name, album_name):
     return image_list
 
 def extract_face(image_list, album, db_session):
+    import face_recognition
     data_dir = Path(current_app.config["data_dir"])
 
     faces = []
     for (i, image_name) in enumerate(image_list):
-        if (i%10 == 0): 
+        if (i%10 == 0 or True): 
             print(f"Album : {album.name}, Image : {i+1}/{len(image_list)}")
-
         image = face_recognition.load_image_file(data_dir / image_name)
-        boxes = face_recognition.face_locations(image)
+        boxes = face_recognition.face_locations(image, model="cnn")
         encodings = face_recognition.face_encodings(image, boxes)
     
         image_db = Image(name=image_name, album=album)
@@ -76,6 +75,8 @@ def cluster(album_db, faces_db, db_session):
 
     for i, label in enumerate(labels):
         faces_db[i].cluster = label
+    
+    db_session.commit()
 
     print("Train classifier")
     classifier = GaussianProcessClassifier()

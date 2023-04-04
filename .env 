@@ -1,0 +1,5 @@
+DB_URI=mariadb+pymysql://flask:passwordflask@mariadb:3306/flask
+BROKER_URI=redis://redis:6379
+DATA_DIR=/data
+ADMIN_PASSWORD=whatapassword
+SECRET_KEY=OUILOUILOUIL
