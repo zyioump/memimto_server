@@ -94,7 +94,7 @@ def extract_face(image_list, album, db_session):
 
     faces = []
     for (i, image_name) in enumerate(image_list):
-        if (i%10 == 0): 
+        if (i%10 == 0 or True): 
             print(f"Album : {album.name}, Image : {i+1}/{len(image_list)}")
         image = load_image_file(data_dir / image_name)
         boxes = face_recognition.face_locations(image, model="cnn")
