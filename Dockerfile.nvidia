@@ -1,0 +1,44 @@
+
+# This is a sample Dockerfile you can modify to deploy your own app based on face_recognition on the GPU
+# In order to run Docker in the GPU you will need to install Nvidia-Docker: https://github.com/NVIDIA/nvidia-docker
+
+FROM nvidia/cuda:11.3.0-cudnn8-devel-ubuntu20.04
+
+# Install face recognition dependencies
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ="Europe/Paris"
+
+RUN ln -fs /usr/share/zoneinfo/Europe/Paris /etc/localtime && apt-get update && apt-get -y install python3 python3-pip git cmake build-essential
+
+RUN git clone https://github.com/davisking/dlib.git\
+&&  cd dlib\
+&&  mkdir build\
+&&  cd build\
+&&  cmake .. -DDLIB_USE_CUDA=1 -DUSE_AVX_INSTRUCTIONS=1\
+&&  cmake --build .\
+&&  cd ..\
+&&  python3 setup.py install --set DLIB_USE_CUDA=1
+
+WORKDIR /app
+
+COPY requirements.txt requirements.txt
+
+ENV DEPS="zlib1g-dev libjpeg-dev"
+
+RUN apt-get update \
+  && apt-get install -y ${DEPS} --no-install-recommends \
+  && pip3 install click==7.1.2\
+  && pip3 install -r requirements.txt \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /usr/share/doc && rm -rf /usr/share/man \
+  && apt-get purge -y --auto-remove ${DEPS} \
+  && apt-get clean
+
+COPY . .
+
+RUN python3 setup.py install
+
+EXPOSE 8000
+
+CMD ["gunicorn", "-b", "0.0.0.0", "--log-level=DEBUG", "memimto.__main__:app"]

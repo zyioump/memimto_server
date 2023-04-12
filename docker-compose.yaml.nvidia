@@ -1,0 +1,71 @@
+version: "3.4"
+
+services:
+  mariadb:
+    image: mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_PASSWORD=passwordflask
+      - MYSQL_USER=flask
+      - MYSQL_DATABASE=flask
+      - MYSQL_MAX_ALLOWED_PACKET=200M
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.nvidia
+    volumes: 
+      - data:/data
+    depends_on:
+      - redis
+      - mariadb
+    ports:
+      - 8000:8000
+    environment:
+      - DB_URI=mariadb+pymysql://flask:passwordflask@mariadb:3306/flask
+      - BROKER_URI=redis://redis:6379
+      - DATA_DIR=/data
+      - ADMIN_PASSWORD=whatapassword
+      - SECRET_KEY=OUILOUILOUIL
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.nvidia
+    volumes: 
+      - data:/data
+    depends_on:
+      - redis
+      - mariadb
+    environment:
+      - DB_URI=mariadb+pymysql://flask:passwordflask@mariadb:3306/flask
+      - BROKER_URI=redis://redis:6379
+      - DATA_DIR=/data
+      - ADMIN_PASSWORD=whatapassword
+      - SECRET_KEY=OUILOUILOUIL
+    command: celery -A memimto.__main__.celery worker
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  data: 
+  db_data:  

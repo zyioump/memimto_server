@@ -63,6 +63,7 @@ class Face(db.Model):
     cluster = db.Column(db.Integer)
     image_id = db.Column(db.Integer, db.ForeignKey("image.id"))
     encoding = db.Column((db.PickleType), nullable=False)
+    boxe = db.Column((db.PickleType), nullable=False)
 
     def to_dict(self):
         return {

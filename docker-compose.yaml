@@ -20,6 +20,7 @@ services:
   web:
     build:
       context: .
+      dockerfile: Dockerfile
     volumes: 
       - data:/data
     depends_on:
@@ -27,17 +28,30 @@ services:
       - mariadb
     ports:
       - 8000:8000
-
+    environment:
+      - DB_URI=mariadb+pymysql://flask:passwordflask@mariadb:3306/flask
+      - BROKER_URI=redis://redis:6379
+      - DATA_DIR=/data
+      - ADMIN_PASSWORD=whatapassword
+      - SECRET_KEY=OUILOUILOUIL
+    
   worker:
     build:
       context: .
+      dockerfile: Dockerfile
     volumes: 
       - data:/data
-    command: celery -A memimto.__main__.celery worker
     depends_on:
       - redis
-      - mariadb 
+      - mariadb
+    environment:
+      - DB_URI=mariadb+pymysql://flask:passwordflask@mariadb:3306/flask
+      - BROKER_URI=redis://redis:6379
+      - DATA_DIR=/data
+      - ADMIN_PASSWORD=whatapassword
+      - SECRET_KEY=OUILOUILOUIL
+    command: celery -A memimto.__main__.celery worker
 
 volumes:
   data: 
-  db_data:
+  db_data:  

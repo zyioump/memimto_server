@@ -1,7 +1,7 @@
 from flask import Blueprint
 from flask import request, current_app, abort, send_file
 from memimto.models import db, Album, Image
-import face_recognition
+#import face_recognition
 from base64 import b64decode
 import os
 import pickle
@@ -38,26 +38,27 @@ def album_cluster(album_id, cluster):
 
 @album_bp.route('/album/<int:album_id>/find_cluster', methods=["POST"])
 def find_cluster(album_id):
-    album = Album.query.get_or_404(album_id)
-    if album.classifier is None:
-        return {"cluster": -1}
+    # album = Album.query.get_or_404(album_id)
+    # if album.classifier is None:
+    #     return {"cluster": -1}
     
-    with open(current_app.config["data_dir"] / album.classifier, "rb") as classifier_file:
-        classifier = pickle.load(classifier_file)
+    # with open(current_app.config["data_dir"] / album.classifier, "rb") as classifier_file:
+    #     classifier = pickle.load(classifier_file)
 
-    image_b64 = request.data.decode().split("base64,")[1]
-    image_data = b64decode(image_b64)
-    image = PIL.Image.open(io.BytesIO(image_data))
-    image = np.array(image.convert("RGB"))
-    boxes = face_recognition.face_locations(image)
-    if len(boxes) > 0:
-        encodings = face_recognition.face_encodings(image, boxes)
-        cluster = classifier.predict(encodings)
-        logging.warning(f"Cluster detected : {cluster} for album {album_id}")
-        return {"cluster": int(cluster[0])}
-    else:
-        logging.warning("No face detected")
-        return {"cluster": -1}
+    # image_b64 = request.data.decode().split("base64,")[1]
+    # image_data = b64decode(image_b64)
+    # image = PIL.Image.open(io.BytesIO(image_data))
+    # image = np.array(image.convert("RGB"))
+    # boxes = face_recognition.face_locations(image)
+    # if len(boxes) > 0:
+    #     encodings = face_recognition.face_encodings(image, boxes)
+    #     cluster = classifier.predict(encodings)
+    #     logging.warning(f"Cluster detected : {cluster} for album {album_id}")
+    #     return {"cluster": int(cluster[0])}
+    # else:
+    #     logging.warning("No face detected")
+    #     return {"cluster": -1}
+    return {"cluster": -1}
 
 @album_bp.route('/image/<name>')
 def image(name):

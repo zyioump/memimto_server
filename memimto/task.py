@@ -6,11 +6,11 @@ from flask import current_app
 from memimto.celery import celery
 from memimto.models import db, Album, Image, Face
 from werkzeug.utils import secure_filename
-import face_recognition
 import pickle
 from sklearn.cluster import OPTICS
-from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.linear_model import SGDClassifier
 import numpy as np
+import PIL.Image
 from uuid import uuid4
 import imghdr
 import logging
@@ -42,22 +42,68 @@ def unzip(file_name, album_name):
     os.remove(data_dir / file_name)
     return image_list
 
+def load_image_file(file, mode='RGB'):
+    """
+    Loads an image file (.jpg, .png, etc) into a numpy array
+    :param file: image file name or file object to load
+    :param mode: format to convert the image to. Only 'RGB' (8-bit RGB, 3 channels) and 'L' (black and white) are supported.
+    :return: image contents as numpy array
+    """
+
+    im = PIL.Image.open(file)
+    width, height = im.size
+    w, h = width, height
+    log = logging.getLogger()
+
+    ratio = -1
+    # Ratio for resize the image
+    # Resize in case of to bigger dimension
+    # In first instance manage the HIGH-Dimension photos
+    if width > 3600 or height > 3600:
+        if width > height:
+            ratio = width / 800
+        else:
+            ratio = height / 800
+
+    elif 1200 <= width <= 1600 or 1200 <= height <= 1600:
+        ratio = 1 / 2
+    elif 1600 <= width <= 3600 or 1600 <= height <= 3600:
+        ratio = 1 / 3
+
+    if 0 < ratio < 1:
+        # Scale image in case of width > 1600
+        w = width * ratio
+        h = height * ratio
+    elif ratio > 1:
+        # Scale image in case of width > 3600
+        w = width / ratio
+        h = height / ratio
+    if w != width:
+        # Check if scaling was applied
+        maxsize = (w, h)
+        im.thumbnail(maxsize, PIL.Image.ANTIALIAS)
+
+    if mode:
+        im = im.convert(mode)
+
+    return np.array(im)
+
 def extract_face(image_list, album, db_session):
+    import face_recognition
     data_dir = Path(current_app.config["data_dir"])
 
     faces = []
     for (i, image_name) in enumerate(image_list):
         if (i%10 == 0): 
             print(f"Album : {album.name}, Image : {i+1}/{len(image_list)}")
-
-        image = face_recognition.load_image_file(data_dir / image_name)
-        boxes = face_recognition.face_locations(image)
+        image = load_image_file(data_dir / image_name)
+        boxes = face_recognition.face_locations(image, model="cnn")
         encodings = face_recognition.face_encodings(image, boxes)
     
         image_db = Image(name=image_name, album=album)
         db_session.add(image_db)
 
-        faces_db = [Face(image=image_db, encoding=pickle.dumps(encoding)) for encoding in encodings]
+        faces_db = [Face(image=image_db, encoding=encoding, boxe=boxe) for encoding, boxe in zip(encodings, boxes)]
         db_session.add_all(faces_db)
 
         faces.extend(faces_db)
@@ -66,7 +112,8 @@ def extract_face(image_list, album, db_session):
     return faces
 
 def cluster(album_db, faces_db, db_session):
-    encodings = [pickle.loads(face.encoding) for face in faces_db]
+    import face_recognition
+    encodings = [face.encoding for face in faces_db]
     encodings = np.vstack(encodings)
     optics = OPTICS(xi=0.0000001, metric="correlation")
     optics.fit(encodings)
@@ -74,14 +121,31 @@ def cluster(album_db, faces_db, db_session):
     labels = optics.labels_
     print(f"{len(np.unique(labels))-1} different faces detected")
 
+    unknow_encodings = encodings[labels == -1]
+    unknow_indices = np.argwhere(labels == -1)
+    know_encodings = encodings[labels != -1]
+    know_label = labels[labels != -1]
+    
+    for i, encoding in zip(unknow_indices, unknow_encodings):
+        comparaison = np.array(face_recognition.compare_faces(know_encodings, encoding))
+        label_match = know_label[comparaison]
+
+        if len(label_match) > 0:
+            label, count = np.unique(label_match, return_counts=True)
+            max_count_indice = np.argmax(count)
+            if count[max_count_indice] / len(labels[labels == label[max_count_indice]]) > 0.3:
+                labels[i] = label[max_count_indice]
+
     for i, label in enumerate(labels):
         faces_db[i].cluster = label
+    
+    db_session.commit()
 
     print("Train classifier")
-    classifier = GaussianProcessClassifier()
+    classifier = SGDClassifier()
     classifier.fit(encodings, labels)
 
-    print("Save")
+    print(f"Save, classifier score : {classifier.score(encodings, labels)}")
     classifier_name = str(uuid4()) + ".pickle"
 
     album_db.classifier = classifier_name
